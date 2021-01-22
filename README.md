@@ -1,4 +1,4 @@
-[![Build Status](https://travis-ci.org/frithnanth/raku-Math-Libgsl-Eigensystem.svg?branch=master)](https://travis-ci.org/frithnanth/raku-Math-Libgsl-Eigensystem) [![Actions Status](https://github.com/frithnanth/raku-Math-Libgsl-Eigensystem/workflows/test/badge.svg)](https://github.com/frithnanth/raku-Math-Libgsl-Eigensystem/actions)
+[![Actions Status](https://github.com/frithnanth/raku-Math-Libgsl-Eigensystem/workflows/test/badge.svg)](https://github.com/frithnanth/raku-Math-Libgsl-Eigensystem/actions) [![Build Status](https://travis-ci.org/frithnanth/raku-Math-Libgsl-Eigensystem.svg?branch=master)](https://travis-ci.org/frithnanth/raku-Math-Libgsl-Eigensystem)
 
 NAME
 ====
@@ -108,7 +108,7 @@ Math::Libgsl::Eigensystem::ComplexGenHerm
 
 ### method compute(Math::Libgsl::Matrix::Complex64 $A where .matrix.size1 == .matrix.size2, Math::Libgsl::Matrix::Complex64 $B where .matrix.size1 == .matrix.size2 && .matrix.size1 == $A.matrix.size1, gsl_eigen_sort_t :$sort --> List)
 
-This method computes the eigenvalues and the eigenvectors, if selected during the initialization. It requires two mandatory **Math::Libgsl::Matrix::Complex64** objects (refer to the amazing C Library documentation for the meaning of those two matrices and the details of the computation). The optional named argument **:$sort** specifies the required sort order.
+This method computes the eigenvalues and the eigenvectors, if selected during the initialization. It requires two mandatory **Math::Libgsl::Matrix::Complex64** objects (refer to the very good C Library documentation for the meaning of those two matrices and the details of the computation). The optional named argument **:$sort** specifies the required sort order.
 
 This method outputs a List of values: a single **Math::Libgsl::Vector**, which contains the eigenvalues, an optional **Math::Libgsl::Matrix::Complex64**, which contains the eigenvectors if they were requested. On exit the first matrix **$A** is destroyed and the second one **$B** will contain the Cholesky decomposition of the eigenvector matrix.
 
@@ -117,7 +117,7 @@ Math::Libgsl::Eigensystem::RealGenNonSymm
 
 ### method compute(Math::Libgsl::Matrix $A where .matrix.size1 == .matrix.size2, Math::Libgsl::Matrix $B where .matrix.size1 == .matrix.size2 && .matrix.size1 == $A.matrix.size1, Bool :$schur-S = False, Bool :$schur-T = False, Bool :$balance = False, Bool :$schur-vectors = False, gsl_eigen_sort_t :$sort --> List)
 
-This method computes the eigenvalues and the eigenvectors, if selected during the initialization. It requires two mandatory **Math::Libgsl::Matrix** objects (refer to the very good C Library documentation for the meaning of those two matrices and the details of the computation). The optional named argument **:$schur-S** requires that it computes the full Schur form S. The optional named argument **:$schur-T** requires that it computes the full Schur form T. The optional named argument **:$balance** requires that a balancing transformation is applied to the matrix prior to computing eigenvalues (currently ignored by the underlying C library; TBI). The optional named argument **:$schur-vectors** requires that it also computes the Schur vectors. The optional named argument **:$sort** specifies the required sort order.
+This method computes the eigenvalues and the eigenvectors, if selected during the initialization. It requires two mandatory **Math::Libgsl::Matrix** objects (refer to the amazing C Library documentation for the meaning of those two matrices and the details of the computation). The optional named argument **:$schur-S** requires that it computes the full Schur form S. The optional named argument **:$schur-T** requires that it computes the full Schur form T. The optional named argument **:$balance** requires that a balancing transformation is applied to the matrix prior to computing eigenvalues (currently ignored by the underlying C library; TBI). The optional named argument **:$schur-vectors** requires that it also computes the Schur vectors. The optional named argument **:$sort** specifies the required sort order.
 
 This method outputs a List of values: one **Math::Libgsl::Vector::Complex64** and one **Math::Libgsl::Vector** object, which contain the eigenvalues (see the C library documentation for the meaning of these two vectors), an optional **Math::Libgsl::Matrix::Complex64**, which contains the eigenvectors if they were requested. If the Schur vectors were requested the left and right Schur vectors are returned as **Math::Libgsl::Matrix** objects. On exit, if **$schur-S** is True, the first matrix **$A** will contain the Schur form S; if **$schur-T** is True, the second matrix **$B** will contain the Schur form T.
 
