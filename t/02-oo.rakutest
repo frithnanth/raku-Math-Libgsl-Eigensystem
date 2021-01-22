@@ -1,0 +1,376 @@
+#!/usr/bin/env perl6
+
+use Test;
+use Math::Libgsl::Constants;
+use Math::Libgsl::Matrix;
+use Math::Libgsl::Matrix::Complex64;
+use Math::Libgsl::Vector;
+use Math::Libgsl::Vector::Complex64;
+use lib 'lib';
+use Math::Libgsl::Eigensystem;
+
+my $*TOLERANCE = 10⁻¹²;
+
+subtest 'real symmetric' => {
+  my Math::Libgsl::Eigensystem::RealSymm $e .= new: 2;
+  isa-ok $e, Math::Libgsl::Eigensystem::RealSymm, 'create eigenvalue object (positional)';
+  ok $e.vectors == False && $e.ws.size == 2, 'verify eigenvalue workspace (positional)';
+  my Math::Libgsl::Eigensystem::RealSymm $e0 .= new: 2, False;
+  isa-ok $e0, Math::Libgsl::Eigensystem::RealSymm, 'create eigenvalue object (positional 2 params)';
+  ok $e0.vectors == False && $e0.ws.size == 2, 'verify eigenvalue workspace (positional 2 params)';
+  my Math::Libgsl::Eigensystem::RealSymm $e1 .= new: 2, True;
+  isa-ok $e1, Math::Libgsl::Eigensystem::RealSymm, 'create eigenvalue+eigenvector object (positional)';
+  ok $e1.vectors == True && $e1.wsv.size == 2, 'verify eigenvalue+eigenvector workspace (positional)';
+  my Math::Libgsl::Eigensystem::RealSymm $e2 .= new: :2size;
+  isa-ok $e2, Math::Libgsl::Eigensystem::RealSymm, 'create eigenvalue object (named)';
+  ok $e2.vectors == False && $e2.ws.size == 2, 'verify eigenvalue workspace (named)';
+  my Math::Libgsl::Eigensystem::RealSymm $e3 .= new: :2size, :!vectors;
+  isa-ok $e3, Math::Libgsl::Eigensystem::RealSymm, 'create eigenvalue object (named 2 params)';
+  ok $e3.vectors == False && $e3.ws.size == 2, 'verify eigenvalue workspace (named 2 params)';
+  my Math::Libgsl::Eigensystem::RealSymm $e4 .= new: :2size, :vectors;
+  isa-ok $e4, Math::Libgsl::Eigensystem::RealSymm, 'create eigenvalue+eigenvector object (named)';
+  ok $e4.vectors == True && $e4.wsv.size == 2, 'verify eigenvalue workspace with vectors (named)';
+
+  my Math::Libgsl::Matrix $vm .= new: 2, 2;
+  $vm[0;0] = 2; $vm[0;1] = 1;
+  $vm[1;0] = 1; $vm[1;1] = 2;
+  my Math::Libgsl::Matrix $sol .= new: 2, 2;
+  $sol[0;0] = 0.7071067811865475; $sol[0;1] = -0.7071067811865475;
+  $sol[1;0] = 0.7071067811865475; $sol[1;1] = 0.7071067811865475;
+  my Math::Libgsl::Matrix $wrong .= new: 3, 3;
+  $wrong.setall(1);
+
+  my ($eval) = $e.compute($vm);
+  ok $eval[0] ≅ 3 && $eval[1] ≅ 1, 'eigenvalues';
+  my $evec;
+  ($eval, $evec) = $e4.compute($vm);
+  ok $eval[0] ≅ 3 && $eval[1] ≅ 1 &&
+     (($evec.get-row($_) for ^2).flat Z≅ ($sol.get-row($_) for ^2).flat), 'eigenvalues+eigenvectors';
+  fails-like { $e.compute($wrong) },
+      X::Libgsl,
+      message => /'The matrix has the wrong size'/,
+      "fails if matrix has wrong sizes";
+  ($eval, $evec) = $e4.compute($vm, :sort(GSL_EIGEN_SORT_VAL_ASC));
+  $sol.swap-cols(0, 1);
+  ok ([&&] ($eval[0] ≅ 1,
+           $eval[1] ≅ 3,
+           (($evec.get-row($_) for ^2).flat Z≅ ($sol.get-row($_) for ^2).flat))),
+           'sorted eigenvalues+eigenvectors';
+}
+
+subtest 'complex hermitian' => {
+  my Math::Libgsl::Eigensystem::ComplexHerm $e .= new: 2;
+  isa-ok $e, Math::Libgsl::Eigensystem::ComplexHerm, 'create eigenvalue object (positional)';
+  ok $e.vectors == False && $e.ws.size == 2, 'verify eigenvalue workspace (positional)';
+  my Math::Libgsl::Eigensystem::ComplexHerm $e0 .= new: 2, False;
+  isa-ok $e0, Math::Libgsl::Eigensystem::ComplexHerm, 'create eigenvalue object (positional 2 params)';
+  ok $e0.vectors == False && $e0.ws.size == 2, 'verify eigenvalue workspace (positional 2 params)';
+  my Math::Libgsl::Eigensystem::ComplexHerm $e1 .= new: 2, True;
+  isa-ok $e1, Math::Libgsl::Eigensystem::ComplexHerm, 'create eigenvalue+eigenvector object (positional)';
+  ok $e1.vectors == True && $e1.wsv.size == 2, 'verify eigenvalue+eigenvector workspace (positional)';
+  my Math::Libgsl::Eigensystem::ComplexHerm $e2 .= new: :2size;
+  isa-ok $e2, Math::Libgsl::Eigensystem::ComplexHerm, 'create eigenvalue object (named)';
+  ok $e2.vectors == False && $e2.ws.size == 2, 'verify eigenvalue workspace (named)';
+  my Math::Libgsl::Eigensystem::ComplexHerm $e3 .= new: :2size, :!vectors;
+  isa-ok $e3, Math::Libgsl::Eigensystem::ComplexHerm, 'create eigenvalue object (named 2 params)';
+  ok $e3.vectors == False && $e3.ws.size == 2, 'verify eigenvalue workspace (named 2 params)';
+  my Math::Libgsl::Eigensystem::ComplexHerm $e4 .= new: :2size, :vectors;
+  isa-ok $e4, Math::Libgsl::Eigensystem::ComplexHerm, 'create eigenvalue+eigenvector object (named)';
+  ok $e4.vectors == True && $e4.wsv.size == 2, 'verify eigenvalue workspace with vectors (named)';
+
+  my Math::Libgsl::Matrix::Complex64 $vm .= new: 2, 2;
+  $vm[0;0] = 1+2i; $vm[0;1] = 0+0i;
+  $vm[1;0] = 0+0i; $vm[1;1] = 1-2i;
+  my Math::Libgsl::Matrix::Complex64 $sol .= new: 2, 2;
+  $sol[0;0] = 1+0i; $sol[0;1] = 0+0i;
+  $sol[1;0] = 0+0i; $sol[1;1] = 1+0i;
+  my Math::Libgsl::Matrix::Complex64 $wrong .= new: 3, 3;
+  $wrong.setall(1+0i);
+
+  my ($eval) = $e.compute($vm);
+  ok $eval[0] ≅ 1 && $eval[1] ≅ 1, 'eigenvalues';
+
+  $vm[0;0] = 1+2i; $vm[0;1] = 0+0i;
+  $vm[1;0] = 0+0i; $vm[1;1] = 1-2i;
+
+  my $evec;
+  ($eval, $evec) = $e4.compute($vm);
+  ok $eval[0] ≅ 1 && $eval[1] ≅ 1 &&
+     (($evec.get-row($_) for ^2).flat Z≅ ($sol.get-row($_) for ^2).flat), 'eigenvalues+eigenvectors';
+  fails-like { $e.compute($wrong) },
+      X::Libgsl,
+      message => /'The matrix has the wrong size'/,
+      "fails if matrix has wrong sizes";
+  ($eval, $evec) = $e4.compute($vm, :sort(GSL_EIGEN_SORT_VAL_ASC));
+  ok ([&&] $eval[0] ≅ 1,
+           $eval[1] ≅ 1,
+           (($evec.get-row($_) for ^2).flat Z≅ ($sol.get-row($_) for ^2).flat)),
+           'sorted eigenvalues+eigenvectors';
+}
+
+subtest 'real non-symmetric' => {
+  my Math::Libgsl::Eigensystem::RealNonSymm $e .= new: 2;
+  isa-ok $e, Math::Libgsl::Eigensystem::RealNonSymm, 'create eigenvalue object (positional)';
+  ok $e.vectors == False && $e.ws.size == 2, 'verify eigenvalue workspace (positional)';
+  my Math::Libgsl::Eigensystem::RealNonSymm $e0 .= new: 2, False;
+  isa-ok $e0, Math::Libgsl::Eigensystem::RealNonSymm, 'create eigenvalue object (positional 2 params)';
+  ok $e0.vectors == False && $e0.ws.size == 2, 'verify eigenvalue workspace (positional 2 params)';
+  my Math::Libgsl::Eigensystem::RealNonSymm $e1 .= new: 2, True;
+  isa-ok $e1, Math::Libgsl::Eigensystem::RealNonSymm, 'create eigenvalue+eigenvector object (positional)';
+  ok $e1.vectors == True && $e1.wsv.size == 2, 'verify eigenvalue+eigenvector workspace (positional)';
+  my Math::Libgsl::Eigensystem::RealNonSymm $e2 .= new: :2size;
+  isa-ok $e2, Math::Libgsl::Eigensystem::RealNonSymm, 'create eigenvalue object (named)';
+  ok $e2.vectors == False && $e2.ws.size == 2, 'verify eigenvalue workspace (named)';
+  my Math::Libgsl::Eigensystem::RealNonSymm $e3 .= new: :2size, :!vectors;
+  isa-ok $e3, Math::Libgsl::Eigensystem::RealNonSymm, 'create eigenvalue object (named 2 params)';
+  ok $e3.vectors == False && $e3.ws.size == 2, 'verify eigenvalue workspace (named 2 params)';
+  my Math::Libgsl::Eigensystem::RealNonSymm $e4 .= new: :2size, :vectors;
+  isa-ok $e4, Math::Libgsl::Eigensystem::RealNonSymm, 'create eigenvalue+eigenvector object (named)';
+  ok $e4.vectors == True && $e4.wsv.size == 2, 'verify eigenvalue workspace with vectors (named)';
+
+  my Math::Libgsl::Matrix $vm .= new: 2, 2;
+  $vm[0;0] = 1; $vm[0;1] = 1;
+  $vm[1;0] = 0; $vm[1;1] = 1;
+  my Math::Libgsl::Matrix::Complex64 $sol .= new: 2, 2;
+  $sol[0;0] = 1+0i; $sol[0;1] = -1+0i;
+  $sol[1;0] = 0+0i; $sol[1;1] = 0+0i;
+  my Math::Libgsl::Matrix $solz .= new: 2, 2;
+  $solz[0;0] = 1; $solz[0;1] = 0;
+  $solz[1;0] = 0; $solz[1;1] = 1;
+  my Math::Libgsl::Matrix $wrong .= new: 3, 3;
+  $wrong.setall(1);
+
+  my ($eval) = $e.compute($vm, :schur, :!balance);
+  ok $eval[0] == 1+0i && $eval[1] == 1+0i, 'eigenvalues';
+
+  my $Z;
+  ($eval, $Z) = $e.compute($vm, :schur-vectors, :schur, :!balance);
+  ok ([&&] $eval[0] == 1+0i,
+           $eval[1] == 1+0i,
+           (($Z.get-row($_) for ^2).flat Z== ($solz.get-row($_) for ^2).flat)),
+           'eigenvalues and Schur vectors';
+
+  my $evec;
+  ($eval, $evec) = $e4.compute($vm);
+  ok $eval[0] == 1+0i && $eval[1] == 1+0i &&
+     (($evec.get-row($_) for ^2).flat Z≅ ($sol.get-row($_) for ^2).flat), 'eigenvalues+eigenvectors';
+  fails-like { $e4.compute($wrong) },
+      X::Libgsl,
+      message => /'The matrix has the wrong size'/,
+      "fails if matrix has wrong sizes";
+  ($eval, $evec) = $e4.compute($vm, :sort(GSL_EIGEN_SORT_VAL_ASC));
+  ok ([&&] $eval[0] == 1+0i,
+           $eval[1] == 1+0i,
+           (($evec.get-row($_) for ^2).flat Z≅ ($sol.get-row($_) for ^2).flat)),
+           'sorted eigenvalues+eigenvectors';
+
+  ($eval, $evec, $Z) = $e4.compute($vm, :schur-vectors);
+  ok ([&&] $eval[0] == 1+0i,
+           $eval[1] == 1+0i,
+           (($evec.get-row($_) for ^2).flat Z≅ ($sol.get-row($_) for ^2).flat),
+           (($Z.get-row($_) for ^2).flat Z== ($solz.get-row($_) for ^2).flat)),
+           'eigenvalues+eigenvectors and Schur vectors';
+}
+
+subtest 'real generalized symmetric-definite' => {
+  my Math::Libgsl::Eigensystem::RealGenSymm $e .= new: 2;
+  isa-ok $e, Math::Libgsl::Eigensystem::RealGenSymm, 'create eigenvalue object (positional)';
+  ok $e.vectors == False && $e.ws.size == 2, 'verify eigenvalue workspace (positional)';
+  my Math::Libgsl::Eigensystem::RealGenSymm $e0 .= new: 2, False;
+  isa-ok $e0, Math::Libgsl::Eigensystem::RealGenSymm, 'create eigenvalue object (positional 2 params)';
+  ok $e0.vectors == False && $e0.ws.size == 2, 'verify eigenvalue workspace (positional 2 params)';
+  my Math::Libgsl::Eigensystem::RealGenSymm $e1 .= new: 2, True;
+  isa-ok $e1, Math::Libgsl::Eigensystem::RealGenSymm, 'create eigenvalue+eigenvector object (positional)';
+  ok $e1.vectors == True && $e1.wsv.size == 2, 'verify eigenvalue+eigenvector workspace (positional)';
+  my Math::Libgsl::Eigensystem::RealGenSymm $e2 .= new: :2size;
+  isa-ok $e2, Math::Libgsl::Eigensystem::RealGenSymm, 'create eigenvalue object (named)';
+  ok $e2.vectors == False && $e2.ws.size == 2, 'verify eigenvalue workspace (named)';
+  my Math::Libgsl::Eigensystem::RealGenSymm $e3 .= new: :2size, :!vectors;
+  isa-ok $e3, Math::Libgsl::Eigensystem::RealGenSymm, 'create eigenvalue object (named 2 params)';
+  ok $e3.vectors == False && $e3.ws.size == 2, 'verify eigenvalue workspace (named 2 params)';
+  my Math::Libgsl::Eigensystem::RealGenSymm $e4 .= new: :2size, :vectors;
+  isa-ok $e4, Math::Libgsl::Eigensystem::RealGenSymm, 'create eigenvalue+eigenvector object (named)';
+  ok $e4.vectors == True && $e4.wsv.size == 2, 'verify eigenvalue workspace with vectors (named)';
+
+  my Math::Libgsl::Matrix $A .= new: 2, 2;
+  $A[0;0] = 1; $A[0;1] = 0;
+  $A[1;0] = 0; $A[1;1] = 0;
+  my Math::Libgsl::Matrix $B .= new: 2, 2;
+  $B[0;0] = 1; $B[0;1] = 0;
+  $B[1;0] = 0; $B[1;1] = 2;
+  my Math::Libgsl::Matrix $wrong1 .= new: 3, 3;
+  $wrong1.setall(1);
+  my Math::Libgsl::Matrix $wrong2 .= new: 3, 3;
+  $wrong2.setall(1);
+
+  my ($eval) = $e.compute($A, $B);
+  ok $eval[0] == 1 && $eval[1] == 0, 'eigenvalues';
+
+  $A[0;0] = 1; $A[0;1] = 0;
+  $A[1;0] = 0; $A[1;1] = 0;
+  $B[0;0] = 1; $B[0;1] = 0;
+  $B[1;0] = 0; $B[1;1] = 2;
+  my $evec;
+  ($eval, $evec) = $e4.compute($A, $B);
+  ok $eval[0] == 1 && $eval[1] == 0 &&
+      (($evec.get-row($_) for ^2).flat Z≅ (1, 0, 0, 1)), 'eigenvalues+eigenvectors';
+  fails-like { $e4.compute($wrong1, $wrong2) },
+      X::Libgsl,
+      message => /'The matrices have the wrong size'/,
+      "fails if matrix has wrong sizes";
+  $A[0;0] = 1; $A[0;1] = 0;
+  $A[1;0] = 0; $A[1;1] = 0;
+  $B[0;0] = 1; $B[0;1] = 0;
+  $B[1;0] = 0; $B[1;1] = 2;
+  ($eval, $evec) = $e4.compute($A, $B, :sort(GSL_EIGEN_SORT_VAL_ASC));
+  ok ([&&] ($eval[0] == 0,
+           $eval[1] == 1,
+           (($evec.get-row($_) for ^2).flat Z≅ (1, 0, 0, 1)))),
+           'sorted eigenvalues+eigenvectors';
+}
+
+subtest 'complex generalized hermitian-definite' => {
+  my Math::Libgsl::Eigensystem::ComplexGenHerm $e .= new: 2;
+  isa-ok $e, Math::Libgsl::Eigensystem::ComplexGenHerm, 'create eigenvalue object (positional)';
+  ok $e.vectors == False && $e.ws.size == 2, 'verify eigenvalue workspace (positional)';
+  my Math::Libgsl::Eigensystem::ComplexGenHerm $e0 .= new: 2, False;
+  isa-ok $e0, Math::Libgsl::Eigensystem::ComplexGenHerm, 'create eigenvalue object (positional 2 params)';
+  ok $e0.vectors == False && $e0.ws.size == 2, 'verify eigenvalue workspace (positional 2 params)';
+  my Math::Libgsl::Eigensystem::ComplexGenHerm $e1 .= new: 2, True;
+  isa-ok $e1, Math::Libgsl::Eigensystem::ComplexGenHerm, 'create eigenvalue+eigenvector object (positional)';
+  ok $e1.vectors == True && $e1.wsv.size == 2, 'verify eigenvalue+eigenvector workspace (positional)';
+  my Math::Libgsl::Eigensystem::ComplexGenHerm $e2 .= new: :2size;
+  isa-ok $e2, Math::Libgsl::Eigensystem::ComplexGenHerm, 'create eigenvalue object (named)';
+  ok $e2.vectors == False && $e2.ws.size == 2, 'verify eigenvalue workspace (named)';
+  my Math::Libgsl::Eigensystem::ComplexGenHerm $e3 .= new: :2size, :!vectors;
+  isa-ok $e3, Math::Libgsl::Eigensystem::ComplexGenHerm, 'create eigenvalue object (named 2 params)';
+  ok $e3.vectors == False && $e3.ws.size == 2, 'verify eigenvalue workspace (named 2 params)';
+  my Math::Libgsl::Eigensystem::ComplexGenHerm $e4 .= new: :2size, :vectors;
+  isa-ok $e4, Math::Libgsl::Eigensystem::ComplexGenHerm, 'create eigenvalue+eigenvector object (named)';
+  ok $e4.vectors == True && $e4.wsv.size == 2, 'verify eigenvalue workspace with vectors (named)';
+
+  my Math::Libgsl::Matrix::Complex64 $A .= new: 2, 2;
+  $A[0;0] = 1+2i; $A[0;1] = 0+0i;
+  $A[1;0] = 0+0i; $A[1;1] = 1-2i;
+  my Math::Libgsl::Matrix::Complex64 $B .= new: 2, 2;
+  $B[0;0] = 1+2i; $B[0;1] = 0+0i;
+  $B[1;0] = 0+0i; $B[1;1] = 1-2i;
+  my Math::Libgsl::Matrix::Complex64 $sol .= new: 2, 2;
+  $sol[0;0] = 1+0i; $sol[0;1] = 0+0i;
+  $sol[1;0] = 0+0i; $sol[1;1] = 1+0i;
+  my Math::Libgsl::Matrix::Complex64 $wrong1 .= new: 3, 3;
+  $wrong1.setall(1+0i);
+  my Math::Libgsl::Matrix::Complex64 $wrong2 .= new: 3, 3;
+  $wrong2.setall(1+0i);
+
+  my ($eval) = $e.compute($A, $B);
+  ok $eval[0] ≅ 1 && $eval[1] ≅ 1, 'eigenvalues';
+
+  $A[0;0] = 1+2i; $A[0;1] = 0+0i;
+  $A[1;0] = 0+0i; $A[1;1] = 1-2i;
+  $B[0;0] = 1+2i; $B[0;1] = 0+0i;
+  $B[1;0] = 0+0i; $B[1;1] = 1-2i;
+  my $evec;
+  ($eval, $evec) = $e4.compute($A, $B);
+  ok $eval[0] ≅ 1 && $eval[1] ≅ 1 &&
+     (($evec.get-row($_) for ^2).flat Z≅ ($sol.get-row($_) for ^2).flat), 'eigenvalues+eigenvectors';
+  fails-like { $e.compute($wrong1, $wrong2) },
+      X::Libgsl,
+      message => /'The matrices have the wrong size'/,
+      "fails if matrix has wrong sizes";
+  ($eval, $evec) = $e4.compute($A, $B, :sort(GSL_EIGEN_SORT_VAL_ASC));
+  ok ([&&] $eval[0] ≅ 1,
+           $eval[1] ≅ 1,
+           (($evec.get-row($_) for ^2).flat Z≅ ($sol.get-row($_) for ^2).flat)),
+           'sorted eigenvalues+eigenvectors';
+}
+
+subtest 'real generalized nonsymmetric' => {
+  my Math::Libgsl::Eigensystem::RealGenNonSymm $e .= new: 2;
+  isa-ok $e, Math::Libgsl::Eigensystem::RealGenNonSymm, 'create eigenvalue object (positional)';
+  ok $e.vectors == False && $e.ws.size == 2, 'verify eigenvalue workspace (positional)';
+  my Math::Libgsl::Eigensystem::RealGenNonSymm $e0 .= new: 2, False;
+  isa-ok $e0, Math::Libgsl::Eigensystem::RealGenNonSymm, 'create eigenvalue object (positional 2 params)';
+  ok $e0.vectors == False && $e0.ws.size == 2, 'verify eigenvalue workspace (positional 2 params)';
+  my Math::Libgsl::Eigensystem::RealGenNonSymm $e1 .= new: 2, True;
+  isa-ok $e1, Math::Libgsl::Eigensystem::RealGenNonSymm, 'create eigenvalue+eigenvector object (positional)';
+  ok $e1.vectors == True && $e1.wsv.size == 2, 'verify eigenvalue+eigenvector workspace (positional)';
+  my Math::Libgsl::Eigensystem::RealGenNonSymm $e2 .= new: :2size;
+  isa-ok $e2, Math::Libgsl::Eigensystem::RealGenNonSymm, 'create eigenvalue object (named)';
+  ok $e2.vectors == False && $e2.ws.size == 2, 'verify eigenvalue workspace (named)';
+  my Math::Libgsl::Eigensystem::RealGenNonSymm $e3 .= new: :2size, :!vectors;
+  isa-ok $e3, Math::Libgsl::Eigensystem::RealGenNonSymm, 'create eigenvalue object (named 2 params)';
+  ok $e3.vectors == False && $e3.ws.size == 2, 'verify eigenvalue workspace (named 2 params)';
+  my Math::Libgsl::Eigensystem::RealGenNonSymm $e4 .= new: :2size, :vectors;
+  isa-ok $e4, Math::Libgsl::Eigensystem::RealGenNonSymm, 'create eigenvalue+eigenvector object (named)';
+  ok $e4.vectors == True && $e4.wsv.size == 2, 'verify eigenvalue workspace with vectors (named)';
+
+  my Math::Libgsl::Matrix $A .= new: 2, 2;
+  $A[0;0] =  4; $A[0;1] =  3;
+  $A[1;0] = -2; $A[1;1] = -3;
+  my Math::Libgsl::Matrix $B .= new: 2, 2;
+  $B[0;0] = 1; $B[0;1] = 0;
+  $B[1;0] = 0; $B[1;1] = 2;
+  my Math::Libgsl::Matrix $wrong1 .= new: 3, 3;
+  $wrong1.setall(1);
+  my Math::Libgsl::Matrix $wrong2 .= new: 3, 3;
+  $wrong2.setall(1);
+
+  my ($alpha, $beta, $Q, $Z);
+
+  ($alpha, $beta) = $e.compute($A, $B);
+  ok ([&&]
+      ($alpha[^2] Z≅ (3.5843865704718905+0i, 1.0585899525348532-1.673926593026514i)),
+      ($beta[^2]  Z≅ (0e0, 1.88930567044481e0))), 'eigenvalues';
+
+  $A[0;0] =  4; $A[0;1] =  3;
+  $A[1;0] = -2; $A[1;1] = -3;
+  $B[0;0] =  1; $B[0;1] =  0;
+  $B[1;0] =  0; $B[1;1] =  2;
+  ($alpha, $beta, $Q, $Z) = $e.compute($A, $B, :schur-vectors);
+  ok ([&&]
+      ($alpha[^2] Z≅ (3.5843865704718905+0i, 1.0585899525348532-1.673926593026514i)),
+      ($beta[^2]  Z≅ (0e0, 1.88930567044481e0)),
+      (($Q.get-row($_) for ^2).flat Z≅ (1, 0, 0, 1)),
+      (($Z.get-row($_) for ^2).flat Z≅ (1, 0, 0, 1))), 'eigenvalues and Schur vectors';
+
+  $A[0;0] =  4; $A[0;1] =  3;
+  $A[1;0] = -2; $A[1;1] = -3;
+  $B[0;0] =  1; $B[0;1] =  0;
+  $B[1;0] =  0; $B[1;1] =  2;
+  my $evec;
+  ($alpha, $beta, $evec) = $e4.compute($A, $B);
+  ok ([&&]
+      ($alpha[^2] Z≅ (3.5843865704718905+0i, 1.0585899525348532-1.673926593026514i)),
+      ($beta[^2]  Z≅ (0e0, 1.88930567044481e0)),
+      (($evec.get-row($_) for ^2).flat Z≅ (1+0i, -0.6834861261734086+0i, 0+0i, 0.729963502737272+0i))),
+      'eigenvalues+eigenvectors';
+  fails-like { $e.compute($wrong1, $wrong2) },
+      X::Libgsl,
+      message => /'The matrices have the wrong size'/,
+      "fails if matrix has wrong sizes";
+  $A[0;0] =  4; $A[0;1] =  3;
+  $A[1;0] = -2; $A[1;1] = -3;
+  $B[0;0] =  1; $B[0;1] =  0;
+  $B[1;0] =  0; $B[1;1] =  2;
+  ($alpha, $beta, $evec) = $e4.compute($A, $B, :sort(GSL_EIGEN_SORT_ABS_ASC));
+  ok ([&&]
+      ($alpha[^2] Z≅ (3.5843865704718905+0i, 1.0585899525348532-1.673926593026514i)),
+      ($beta[^2]  Z≅ (0e0, 1.88930567044481e0)),
+      (($evec.get-row($_) for ^2).flat Z≅ (1+0i, -0.6834861261734086+0i, 0+0i, 0.729963502737272+0i))),
+      'sorted eigenvalues+eigenvectors';
+  $A[0;0] =  4; $A[0;1] =  3;
+  $A[1;0] = -2; $A[1;1] = -3;
+  $B[0;0] =  1; $B[0;1] =  0;
+  $B[1;0] =  0; $B[1;1] =  2;
+  ($alpha, $beta, $evec, $Q, $Z) = $e4.compute($A, $B, :schur-vectors);
+  ok ([&&]
+      ($alpha[^2] Z≅ (3.5843865704718905+0i, 1.0585899525348532-1.673926593026514i)),
+      ($beta[^2]  Z≅ (0e0, 1.88930567044481e0)),
+      (($Q.get-row($_) for ^2).flat Z≅ (1, 0, 0, 1)),
+      (($Z.get-row($_) for ^2).flat Z≅ (1, 0, 0, 1)),
+      (($evec.get-row($_) for ^2).flat Z≅ (1+0i, -0.6834861261734086+0i, 0+0i, 0.729963502737272+0i))),
+      'eigenvalues+eigenvectors and Schur vectors';
+}
+
+done-testing;

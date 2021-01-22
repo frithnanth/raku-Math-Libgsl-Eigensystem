@@ -1,0 +1,416 @@
+#!/usr/bin/env perl6
+
+use Test;
+use NativeCall;
+use Math::Libgsl::Constants;
+use Math::Libgsl::Raw::Complex;
+use Math::Libgsl::Raw::Matrix :ALL;
+use Math::Libgsl::Raw::Matrix::Complex64 :ALL;
+use lib 'lib';
+use Math::Libgsl::Raw::Eigensystem;
+
+my $*TOLERANCE = 10⁻¹²;
+
+sub test-num64-matrix(gsl_matrix $m1, gsl_matrix $m2 where $m1.size1 == $m2.size1 && $m1.size2 == $m2.size2 --> Bool)
+{
+  my Bool $result = True;
+  for ^$m1.size1 X ^$m1.size2 -> ($i, $j) {
+    $result &&= gsl_matrix_get($m1, $i, $j) ≅ gsl_matrix_get($m2, $i, $j);
+  }
+  $result
+}
+
+sub test-complex64-matrix(gsl_matrix_complex $m1, gsl_matrix_complex $m2 where $m1.size1 == $m2.size1 && $m1.size2 == $m2.size2 --> Bool)
+{
+  my Bool $result = True;
+  my gsl_complex $zres1 = alloc_gsl_complex;
+  my gsl_complex $zres2 = alloc_gsl_complex;
+  for ^$m1.size1 X ^$m1.size2 -> ($i, $j) {
+    mgsl_matrix_complex_get($m1, $i, $j, $zres1);
+    mgsl_matrix_complex_get($m2, $i, $j, $zres2);
+    $result &&= $zres1.dat[0] ≅ $zres2.dat[0];
+    $result &&= $zres1.dat[1] ≅ $zres2.dat[1];
+  }
+  free_gsl_complex($zres1);
+  free_gsl_complex($zres2);
+  $result
+}
+
+subtest 'real symmetric' => {
+  my $m = gsl_matrix_alloc(2, 2);
+  gsl_matrix_set($m, 0, 0, 2e0); gsl_matrix_set($m, 0, 1, 1e0);
+  gsl_matrix_set($m, 1, 0, 1e0); gsl_matrix_set($m, 1, 1, 2e0);
+  my $v = gsl_vector_alloc(2);
+  my $vm = gsl_matrix_alloc(2, 2);
+  my $sol = gsl_matrix_alloc(2, 2);
+  gsl_matrix_set($sol, 0, 0, 0.7071067811865475e0); gsl_matrix_set($sol, 0, 1, -0.7071067811865475e0);
+  gsl_matrix_set($sol, 1, 0, 0.7071067811865475e0); gsl_matrix_set($sol, 1, 1, 0.7071067811865475e0);
+
+  my gsl_eigen_symm_workspace $w = gsl_eigen_symm_alloc(2);
+  isa-ok $w, Math::Libgsl::Raw::Eigensystem::gsl_eigen_symm_workspace, 'allocate eigenvalue workspace';
+  ok $w.size == 2, 'eigenvalue workspace size';
+  ok gsl_eigen_symm($m, $v, $w) == GSL_SUCCESS, 'can find eigenvalues';
+  ok gsl_vector_get($v, 0) ≅ 3 && gsl_vector_get($v, 1) ≅ 1, 'eigenvalues';
+  lives-ok { gsl_eigen_symm_free($w) }, 'free eigenvalue workspace';
+
+  gsl_matrix_set($m, 0, 0, 2e0); gsl_matrix_set($m, 0, 1, 1e0);
+  gsl_matrix_set($m, 1, 0, 1e0); gsl_matrix_set($m, 1, 1, 2e0);
+
+  my gsl_eigen_symmv_workspace $vw = gsl_eigen_symmv_alloc(2);
+  isa-ok $vw, Math::Libgsl::Raw::Eigensystem::gsl_eigen_symmv_workspace, 'allocate eigenvector workspace';
+  ok $vw.size == 2, 'eigenvector workspace size';
+  ok gsl_eigen_symmv($m, $v, $vm, $vw) == GSL_SUCCESS, 'can find eigenvalues and eigenvectors';
+  ok gsl_vector_get($v, 0) ≅ 3 && gsl_vector_get($v, 1) ≅ 1, 'eigenvalues';
+  ok test-num64-matrix($vm, $sol), 'eigenvectors';
+  ok gsl_eigen_symmv_sort($v, $vm, GSL_EIGEN_SORT_VAL_ASC) == GSL_SUCCESS, 'can sort eigenvalues and eigenvectors';
+  ok gsl_vector_get($v, 0) ≅ 1 && gsl_vector_get($v, 1) ≅ 3, 'sorted eigenvalues';
+  gsl_matrix_swap_columns($sol, 0, 1);
+  ok test-num64-matrix($vm, $sol), 'sorted eigenvectors';
+  lives-ok { gsl_eigen_symmv_free($vw) }, 'free eigenvector workspace';
+
+  gsl_matrix_free($m);
+  gsl_vector_free($v);
+  gsl_matrix_free($vm);
+  gsl_matrix_free($sol);
+}
+
+subtest 'complex hermitian' => {
+  my $m = gsl_matrix_complex_alloc(2, 2);
+  my $c0 = alloc_gsl_complex;
+  mgsl_complex_rect(0e0, 0e0, $c0);
+  my $c1 = alloc_gsl_complex;
+  mgsl_complex_rect(1e0, 2e0, $c1);
+  my $c2 = alloc_gsl_complex;
+  mgsl_complex_rect(1e0, -2e0, $c2);
+  mgsl_matrix_complex_set($m, 0, 0, $c1); mgsl_matrix_complex_set($m, 0, 1, $c0);
+  mgsl_matrix_complex_set($m, 1, 0, $c0); mgsl_matrix_complex_set($m, 1, 1, $c2);
+  my $v = gsl_vector_alloc(2);
+  my $vm = gsl_matrix_complex_alloc(2, 2);
+  my $sol = gsl_matrix_complex_alloc(2, 2);
+  my $c3 = alloc_gsl_complex;
+  mgsl_complex_rect(1e0, 0e0, $c3);
+  mgsl_matrix_complex_set($sol, 0, 0, $c3); mgsl_matrix_complex_set($sol, 0, 1, $c0);
+  mgsl_matrix_complex_set($sol, 1, 0, $c0); mgsl_matrix_complex_set($sol, 1, 1, $c3);
+
+  my gsl_eigen_herm_workspace $w = gsl_eigen_herm_alloc(2);
+  isa-ok $w, Math::Libgsl::Raw::Eigensystem::gsl_eigen_herm_workspace, 'allocate eigenvalue workspace';
+  ok $w.size == 2, 'eigenvalue workspace size';
+  ok gsl_eigen_herm($m, $v, $w) == GSL_SUCCESS, 'can find eigenvalues';
+  ok gsl_vector_get($v, 0) ≅ 1 && gsl_vector_get($v, 1) ≅ 1, 'eigenvalues';
+  lives-ok { gsl_eigen_herm_free($w) }, 'free eigenvalue workspace';
+
+  mgsl_matrix_complex_set($m, 0, 0, $c1); mgsl_matrix_complex_set($m, 0, 1, $c0);
+  mgsl_matrix_complex_set($m, 1, 0, $c0); mgsl_matrix_complex_set($m, 1, 1, $c2);
+
+  my gsl_eigen_hermv_workspace $vw = gsl_eigen_hermv_alloc(2);
+  isa-ok $vw, Math::Libgsl::Raw::Eigensystem::gsl_eigen_hermv_workspace, 'allocate eigenvector workspace';
+  ok $vw.size == 2, 'eigenvector workspace size';
+  ok gsl_eigen_hermv($m, $v, $vm, $vw) == GSL_SUCCESS, 'can find eigenvalues and eigenvectors';
+  ok gsl_vector_get($v, 0) ≅ 1 && gsl_vector_get($v, 1) ≅ 1, 'eigenvalues';
+  ok test-complex64-matrix($vm, $sol), 'eigenvectors';
+  ok gsl_eigen_hermv_sort($v, $vm, GSL_EIGEN_SORT_VAL_ASC) == GSL_SUCCESS, 'can sort eigenvalues and eigenvectors';
+  ok gsl_vector_get($v, 0) ≅ 1 && gsl_vector_get($v, 1) ≅ 1, 'sorted eigenvalues';
+  ok test-complex64-matrix($vm, $sol), 'sorted eigenvectors';
+  lives-ok { gsl_eigen_hermv_free($vw) }, 'free eigenvector workspace';
+
+  gsl_matrix_complex_free($m);
+  gsl_vector_free($v);
+  gsl_matrix_complex_free($vm);
+  gsl_matrix_complex_free($sol);
+  free_gsl_complex($c0);
+  free_gsl_complex($c1);
+  free_gsl_complex($c2);
+  free_gsl_complex($c3);
+}
+
+subtest 'real non-symmetric' => {
+  my $m = gsl_matrix_alloc(2, 2);
+  gsl_matrix_set($m, 0, 0, 1e0); gsl_matrix_set($m, 0, 1, 1e0);
+  gsl_matrix_set($m, 1, 0, 0e0); gsl_matrix_set($m, 1, 1, 1e0);
+  my $z = gsl_matrix_alloc(2, 2);
+  my $eval = gsl_vector_complex_alloc(2);
+  my $c = alloc_gsl_complex;
+  my $sol = gsl_matrix_complex_alloc(2, 2);
+  my $solz = gsl_matrix_alloc(2, 2);
+  my $c1 = alloc_gsl_complex;
+  mgsl_complex_rect(1e0, 0e0, $c1);
+  my $c2 = alloc_gsl_complex;
+  mgsl_complex_rect(-1e0, 0e0, $c2);
+  my $c3 = alloc_gsl_complex;
+  mgsl_complex_rect(0e0, 0e0, $c3);
+  mgsl_matrix_complex_set($sol, 0, 0, $c1); mgsl_matrix_complex_set($sol, 0, 1, $c2);
+  mgsl_matrix_complex_set($sol, 1, 0, $c3); mgsl_matrix_complex_set($sol, 1, 1, $c3);
+  gsl_matrix_set($solz, 0, 0, 1e0); gsl_matrix_set($solz, 0, 1, 0e0);
+  gsl_matrix_set($solz, 1, 0, 0e0); gsl_matrix_set($solz, 1, 1, 1e0);
+  my gsl_eigen_nonsymm_workspace $w = gsl_eigen_nonsymm_alloc(2);
+  isa-ok $w, Math::Libgsl::Raw::Eigensystem::gsl_eigen_nonsymm_workspace, 'allocate eigenvalue workspace';
+  ok $w.size == 2, 'eigenvalue workspace size';
+
+  lives-ok { gsl_eigen_nonsymm_params(1, 0, $w) }, 'set eigenvalue computation parameters';
+  ok gsl_eigen_nonsymm($m, $eval, $w) == GSL_SUCCESS, 'can find eigenvalues';
+  is-deeply (gather for ^2 -> $i { mgsl_vector_complex_get($eval, $i, $c); take $c.dat[0]; take $c.dat[1] }), (1e0, 0e0, 1e0, 0e0), 'eigenvalues';
+
+  gsl_matrix_set($m, 0, 0, 1e0); gsl_matrix_set($m, 0, 1, 1e0);
+  gsl_matrix_set($m, 1, 0, 0e0); gsl_matrix_set($m, 1, 1, 1e0);
+  ok gsl_eigen_nonsymm_Z($m, $eval, $z, $w) == GSL_SUCCESS, 'can find eigenvalues and Schur vectors';
+  is-deeply (gather for ^2 -> $i { mgsl_vector_complex_get($eval, $i, $c); take $c.dat[0]; take $c.dat[1] }), (1e0, 0e0, 1e0, 0e0), 'eigenvalues';
+  ok test-num64-matrix($z, $solz), 'Schur vectors';
+  lives-ok { gsl_eigen_nonsymm_free($w) }, 'free eigenvalue workspace';
+
+  my gsl_eigen_nonsymmv_workspace $vw = gsl_eigen_nonsymmv_alloc(2);
+  isa-ok $vw, Math::Libgsl::Raw::Eigensystem::gsl_eigen_nonsymmv_workspace, 'allocate eigenvector workspace';
+  gsl_matrix_set($m, 0, 0, 1e0); gsl_matrix_set($m, 0, 1, 1e0);
+  gsl_matrix_set($m, 1, 0, 0e0); gsl_matrix_set($m, 1, 1, 1e0);
+  my $evec = gsl_matrix_complex_alloc(2, 2);
+
+  lives-ok { gsl_eigen_nonsymmv_params(0, $vw) }, 'set eigenvector computation parameters';
+  ok gsl_eigen_nonsymmv($m, $eval, $evec, $vw) == GSL_SUCCESS, 'can find eigenvalues and eigenvectors';
+  is-deeply (gather for ^2 -> $i { mgsl_vector_complex_get($eval, $i, $c); take $c.dat[0]; take $c.dat[1] }), (1e0, 0e0, 1e0, 0e0), 'eigenvalues';
+  ok test-complex64-matrix($evec, $sol), 'eigenvectors';
+  ok gsl_eigen_nonsymmv_sort($eval, $evec, GSL_EIGEN_SORT_VAL_ASC) == GSL_SUCCESS, 'can sort eigenvalues and eigenvectors';
+  is-deeply (gather for ^2 -> $i { mgsl_vector_complex_get($eval, $i, $c); take $c.dat[0]; take $c.dat[1] }), (1e0, 0e0, 1e0, 0e0), 'sorted eigenvalues';
+  ok test-complex64-matrix($evec, $sol), 'sorted eigenvectors';
+
+  gsl_matrix_set($m, 0, 0, 1e0); gsl_matrix_set($m, 0, 1, 1e0);
+  gsl_matrix_set($m, 1, 0, 0e0); gsl_matrix_set($m, 1, 1, 1e0);
+  ok gsl_eigen_nonsymmv_Z($m, $eval, $evec, $z, $vw) == GSL_SUCCESS, 'can find eigenvalues, eigenvectors, and Schur vectors';
+  is-deeply (gather for ^2 -> $i { mgsl_vector_complex_get($eval, $i, $c); take $c.dat[0]; take $c.dat[1] }), (1e0, 0e0, 1e0, 0e0), 'eigenvalues';
+  ok test-complex64-matrix($evec, $sol), 'eigenvectors';
+  is-deeply (gather for ^2 X ^2 -> ($i, $j) { take gsl_matrix_get($z, $i, $j) }), (1e0, 0e0, 0e0, 1e0), 'Schur vectors';
+
+  lives-ok { gsl_eigen_nonsymmv_free($vw) }, 'free eigenvector workspace';
+  gsl_matrix_free($m);
+  gsl_matrix_free($z);
+  gsl_vector_complex_free($eval);
+  free_gsl_complex($c);
+  gsl_matrix_complex_free($evec);
+}
+
+subtest 'real generalized symmetric-definite' => {
+  my gsl_eigen_gensymm_workspace $w = gsl_eigen_gensymm_alloc(2);
+  isa-ok $w, Math::Libgsl::Raw::Eigensystem::gsl_eigen_gensymm_workspace, 'allocate eigenvalue workspace';
+  ok $w.size == 2, 'eigenvalue workspace size';
+
+  my $A = gsl_matrix_alloc(2, 2);
+  gsl_matrix_set($A, 0, 0, 1e0); gsl_matrix_set($A, 0, 1, 0e0);
+  gsl_matrix_set($A, 1, 0, 0e0); gsl_matrix_set($A, 1, 1, 0e0);
+  my $B = gsl_matrix_alloc(2, 2);
+  gsl_matrix_set($B, 0, 0, 1e0); gsl_matrix_set($B, 0, 1, 0e0);
+  gsl_matrix_set($B, 1, 0, 0e0); gsl_matrix_set($B, 1, 1, 2e0);
+  my $v = gsl_vector_alloc(2);
+
+  ok gsl_eigen_gensymm($A, $B, $v, $w) == GSL_SUCCESS, 'can find eigenvalues';
+  ok gsl_vector_get($v, 0) == 1 && gsl_vector_get($v, 1) == 0, 'eigenvalues';
+  lives-ok { gsl_eigen_gensymm_free($w) }, 'free eigenvalue workspace';
+
+  my gsl_eigen_gensymmv_workspace $vw = gsl_eigen_gensymmv_alloc(2);
+  isa-ok $vw, Math::Libgsl::Raw::Eigensystem::gsl_eigen_gensymmv_workspace, 'allocate eigenvector workspace';
+  ok $vw.size == 2, 'eigenvector workspace size';
+  gsl_matrix_set($B, 0, 0, 1e0); gsl_matrix_set($B, 0, 1, 0e0);
+  gsl_matrix_set($B, 1, 0, 0e0); gsl_matrix_set($B, 1, 1, 2e0);
+  my $vm = gsl_matrix_alloc(2, 2);
+  my $sol = gsl_matrix_alloc(2, 2);
+  gsl_matrix_set($sol, 0, 0, 1e0); gsl_matrix_set($sol, 0, 1, 0e0);
+  gsl_matrix_set($sol, 1, 0, 0e0); gsl_matrix_set($sol, 1, 1, 1e0);
+
+  ok gsl_eigen_gensymmv($A, $B, $v, $vm, $vw) == GSL_SUCCESS, 'can find eigenvalues and eigenvectors';
+  ok gsl_vector_get($v, 0) == 1 && gsl_vector_get($v, 1) == 0, 'eigenvalues';
+  ok test-num64-matrix($vm, $sol), 'eigenvectors';
+  ok gsl_eigen_gensymmv_sort($v, $vm, GSL_EIGEN_SORT_VAL_ASC) == GSL_SUCCESS, 'can sort eigenvalues and eigenvectors';
+  ok gsl_vector_get($v, 0) == 0 && gsl_vector_get($v, 1) == 1, 'sorted eigenvalues';
+  gsl_matrix_swap_columns($sol, 0, 1);
+  ok test-num64-matrix($vm, $sol), 'sorted eigenvectors';
+  lives-ok { gsl_eigen_gensymmv_free($vw) }, 'free eigenvector workspace';
+
+  gsl_matrix_free($A);
+  gsl_matrix_free($B);
+  gsl_matrix_free($vm);
+  gsl_matrix_free($sol);
+  gsl_vector_free($v);
+}
+
+subtest 'complex generalized hermitian-definite' => {
+  my $A = gsl_matrix_complex_alloc(2, 2);
+  my $B = gsl_matrix_complex_alloc(2, 2);
+  my $c0 = alloc_gsl_complex;
+  mgsl_complex_rect(0e0, 0e0, $c0);
+  my $c1 = alloc_gsl_complex;
+  mgsl_complex_rect(1e0, 2e0, $c1);
+  my $c2 = alloc_gsl_complex;
+  mgsl_complex_rect(1e0, -2e0, $c2);
+  mgsl_matrix_complex_set($A, 0, 0, $c1); mgsl_matrix_complex_set($A, 0, 1, $c0);
+  mgsl_matrix_complex_set($A, 1, 0, $c0); mgsl_matrix_complex_set($A, 1, 1, $c2);
+  mgsl_matrix_complex_set($B, 0, 0, $c1); mgsl_matrix_complex_set($B, 0, 1, $c0);
+  mgsl_matrix_complex_set($B, 1, 0, $c0); mgsl_matrix_complex_set($B, 1, 1, $c2);
+  my $v = gsl_vector_alloc(2);
+  my $vm = gsl_matrix_complex_alloc(2, 2);
+  my $sol = gsl_matrix_complex_alloc(2, 2);
+  my $c3 = alloc_gsl_complex;
+  mgsl_complex_rect(1e0, 0e0, $c3);
+  mgsl_matrix_complex_set($sol, 0, 0, $c3); mgsl_matrix_complex_set($sol, 0, 1, $c0);
+  mgsl_matrix_complex_set($sol, 1, 0, $c0); mgsl_matrix_complex_set($sol, 1, 1, $c3);
+
+  my gsl_eigen_genherm_workspace $w = gsl_eigen_genherm_alloc(2);
+  isa-ok $w, Math::Libgsl::Raw::Eigensystem::gsl_eigen_genherm_workspace, 'allocate eigenvalue workspace';
+  ok $w.size == 2, 'eigenvalue workspace size';
+  ok gsl_eigen_genherm($A, $B, $v, $w) == GSL_SUCCESS, 'can find eigenvalues';
+  ok gsl_vector_get($v, 0) == 1 && gsl_vector_get($v, 1) == 1, 'eigenvalues';
+  lives-ok { gsl_eigen_genherm_free($w) }, 'free eigenvalue workspace';
+
+  mgsl_matrix_complex_set($A, 0, 0, $c1); mgsl_matrix_complex_set($A, 0, 1, $c0);
+  mgsl_matrix_complex_set($A, 1, 0, $c0); mgsl_matrix_complex_set($A, 1, 1, $c2);
+
+  my gsl_eigen_genhermv_workspace $vw = gsl_eigen_genhermv_alloc(2);
+  isa-ok $vw, Math::Libgsl::Raw::Eigensystem::gsl_eigen_genhermv_workspace, 'allocate eigenvector workspace';
+  ok $vw.size == 2, 'eigenvector workspace size';
+  ok gsl_eigen_genhermv($A, $B, $v, $vm, $vw) == GSL_SUCCESS, 'can find eigenvalues and eigenvectors';
+  ok gsl_vector_get($v, 0) == 1 && gsl_vector_get($v, 1) == 1, 'eigenvalues';
+  ok test-complex64-matrix($vm, $sol), 'eigenvectors';
+  ok gsl_eigen_genhermv_sort($v, $vm, GSL_EIGEN_SORT_VAL_ASC) == GSL_SUCCESS, 'can sort eigenvalues and eigenvectors';
+  ok gsl_vector_get($v, 0) == 1 && gsl_vector_get($v, 1) == 1, 'sorted eigenvalues';
+  ok test-complex64-matrix($vm, $sol), 'sorted eigenvectors';
+  lives-ok { gsl_eigen_genhermv_free($vw) }, 'free eigenvector workspace';
+
+  gsl_matrix_complex_free($A);
+  gsl_matrix_complex_free($B);
+  gsl_vector_free($v);
+  gsl_matrix_complex_free($vm);
+  gsl_matrix_complex_free($sol);
+  free_gsl_complex($c0);
+  free_gsl_complex($c1);
+  free_gsl_complex($c2);
+  free_gsl_complex($c3);
+}
+
+subtest 'real generalized nonsymmetric' => {
+  my $A = gsl_matrix_alloc(2, 2);
+  my $B = gsl_matrix_alloc(2, 2);
+  my $Q = gsl_matrix_alloc(2, 2);
+  my $Z = gsl_matrix_alloc(2, 2);
+  gsl_matrix_set($A, 0, 0,  4e0); gsl_matrix_set($A, 0, 1,  3e0);
+  gsl_matrix_set($A, 1, 0, -2e0); gsl_matrix_set($A, 1, 1, -3e0);
+  gsl_matrix_set($B, 0, 0,  1e0); gsl_matrix_set($B, 0, 1,  0e0);
+  gsl_matrix_set($B, 1, 0,  0e0); gsl_matrix_set($B, 1, 1,  2e0);
+  my $solQ = gsl_matrix_alloc(2, 2);
+  my $solZ = gsl_matrix_alloc(2, 2);
+  gsl_matrix_set($solQ, 0, 0, 1e0); gsl_matrix_set($solQ, 0, 1, 0e0);
+  gsl_matrix_set($solQ, 1, 0, 0e0); gsl_matrix_set($solQ, 1, 1, 1e0);
+  gsl_matrix_set($solZ, 0, 0, 1e0); gsl_matrix_set($solZ, 0, 1, 0e0);
+  gsl_matrix_set($solZ, 1, 0, 0e0); gsl_matrix_set($solZ, 1, 1, 1e0);
+  my $alpha = gsl_vector_complex_alloc(2);
+  my $c     = alloc_gsl_complex;
+  my $beta  = gsl_vector_alloc(2);
+  my $vm    = gsl_matrix_complex_alloc(2, 2);
+  my $solvm = gsl_matrix_complex_alloc(2, 2);
+  my $c0 = alloc_gsl_complex;
+  my $c1 = alloc_gsl_complex;
+  my $c2 = alloc_gsl_complex;
+  my $c3 = alloc_gsl_complex;
+  mgsl_complex_rect(1e0, 0e0, $c0);
+  mgsl_complex_rect(-0.6834861261734086e0, 0e0, $c1);
+  mgsl_complex_rect(0e0, 0e0, $c2);
+  mgsl_complex_rect(0.729963502737272e0, 0e0, $c3);
+  mgsl_matrix_complex_set($solvm, 0, 0, $c0); mgsl_matrix_complex_set($solvm, 0, 1, $c1);
+  mgsl_matrix_complex_set($solvm, 1, 0, $c2); mgsl_matrix_complex_set($solvm, 1, 1, $c3);
+
+  my gsl_eigen_gen_workspace $w = gsl_eigen_gen_alloc(2);
+  isa-ok $w, Math::Libgsl::Raw::Eigensystem::gsl_eigen_gen_workspace, 'allocate eigenvalue workspace';
+  ok $w.size == 2, 'eigenvalue workspace size';
+  lives-ok { gsl_eigen_gen_params(0, 0, 0, $w) }, 'set computation parameters';
+  ok gsl_eigen_gen($A, $B, $alpha, $beta, $w) == GSL_SUCCESS, 'can find eigenvalues';
+  ok ((gather for ^2 -> $i
+        {
+          mgsl_vector_complex_get($alpha, $i, $c);
+          take $c.dat[0];
+          take $c.dat[1];
+          take gsl_vector_get($beta, $i)
+        }
+      )
+      Z≅
+      (3.5843865704718905e0, 0e0, 1.0585899525348532e0,
+       -1.673926593026514e0, 0e0, 1.88930567044481e0)
+  ), 'eigenvalues';
+  ok gsl_eigen_gen_QZ($A, $B, $alpha, $beta, $Q, $Z, $w) == GSL_SUCCESS, 'can find eigenvalues and Schur vectors';
+  ok ([&&] ((gather for ^2 -> $i
+        {
+          mgsl_vector_complex_get($alpha, $i, $c);
+          take $c.dat[0];
+          take $c.dat[1];
+          take gsl_vector_get($beta, $i);
+        }
+      )
+      Z≅
+      (3.5843865704718905e0, 0e0, 1.0585899525348532e0,
+       -1.673926593026514e0, 0e0, 1.88930567044481e0)
+    ),
+    test-num64-matrix($Q, $solQ),
+    test-num64-matrix($Z, $solZ)
+  ), 'eigenvalues and Schur vectors';
+  lives-ok { gsl_eigen_gen_free($w) }, 'free eigenvalue workspace';
+
+  my gsl_eigen_genv_workspace $vw = gsl_eigen_genv_alloc(2);
+  isa-ok $vw, Math::Libgsl::Raw::Eigensystem::gsl_eigen_genv_workspace, 'allocate eigenvector workspace';
+  ok $vw.size == 2, 'eigenvector workspace size';
+  ok gsl_eigen_genv($A, $B, $alpha, $beta, $vm, $vw) == GSL_SUCCESS, 'can find eigenvalues';
+  ok ([&&] ((gather for ^2 -> $i {
+              mgsl_vector_complex_get($alpha, $i, $c);
+              take $c.dat[0];
+              take $c.dat[1];
+              take gsl_vector_get($beta, $i)
+            })
+            Z≅
+            (3.5843865704718905e0, 0e0, 1.0585899525348532e0,
+             -1.673926593026514e0, 0e0, 1.88930567044481e0)
+    ),
+    test-complex64-matrix($vm, $solvm)
+  ), 'eigenvalues';
+  ok gsl_eigen_genv_QZ($A, $B, $alpha, $beta, $vm, $Q, $Z, $vw) == GSL_SUCCESS, 'can find eigenvalues and Schur vectors';
+  ok ([&&] ((gather for ^2 -> $i {
+              mgsl_vector_complex_get($alpha, $i, $c);
+              take $c.dat[0];
+              take $c.dat[1];
+              take gsl_vector_get($beta, $i);
+            })
+            Z≅
+            (3.5843865704718905e0, 0e0, 1.0585899525348532e0,
+             -1.673926593026514e0, 0e0, 1.88930567044481e0)
+    ),
+    test-num64-matrix($Q, $solQ),
+    test-num64-matrix($Z, $solZ),
+    test-complex64-matrix($vm, $solvm)
+  ), 'eigenvalues and Schur vectors';
+
+  ok gsl_eigen_genv_sort($alpha, $beta, $vm, GSL_EIGEN_SORT_ABS_ASC) == GSL_SUCCESS, 'can sort eigenvalues and eigenvectors';
+  gsl_matrix_complex_swap_columns($solvm, 0, 1);
+  ok ([&&] ((gather for ^2 -> $i {
+              mgsl_vector_complex_get($alpha, $i, $c);
+              take $c.dat[0];
+              take $c.dat[1];
+              take gsl_vector_get($beta, $i);
+            })
+            Z≅
+            (-1.673926593026514e0, 0e0, 1.88930567044481e0,
+             3.5843865704718905e0, 0e0, 1.0585899525348532e0)
+    ),
+    test-complex64-matrix($vm, $solvm)
+  ), 'sorted eigenvalues and eigenvectors';
+  lives-ok { gsl_eigen_genv_free($vw) }, 'free eigenvector workspace';
+
+  free_gsl_complex($c);
+  free_gsl_complex($c0);
+  free_gsl_complex($c1);
+  free_gsl_complex($c2);
+  free_gsl_complex($c3);
+  gsl_matrix_free($A);
+  gsl_matrix_free($B);
+  gsl_matrix_free($Q);
+  gsl_matrix_free($Z);
+  gsl_matrix_free($solQ);
+  gsl_matrix_free($solZ);
+  gsl_matrix_complex_free($vm);
+  gsl_matrix_complex_free($solvm);
+  gsl_vector_complex_free($alpha);
+  gsl_vector_free($beta);
+}
+
+done-testing;
