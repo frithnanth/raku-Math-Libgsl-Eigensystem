@@ -1,6 +1,7 @@
 Revision history for Math-Libgsl-Eigensystem
 
 {{$NEXT}}
+    - Use zef ecosystem
 
 0.0.2  2021-10-27T13:34:51+02:00
     - Adjust some tests
